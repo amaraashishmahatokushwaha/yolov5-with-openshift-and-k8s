@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-camera-app
+  labels:
+    app: flask-camera-app
+spec:
+  replicas: 1  # Start with one replica
+  selector:
+    matchLabels:
+      app: flask-camera-app
+  template:
+    metadata:
+      labels:
+        app: flask-camera-app
+    spec:
+      containers:
+      - name: flask-camera-app
+        image: amardocker608/flask-camera:latest
+        ports:
+        - containerPort: 5000
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        securityContext:
+          privileged: true  # Required for accessing video devices
+        volumeMounts:
+        - name: video-device
+          mountPath: /dev/video0
+      volumes:
+      - name: video-device
+        hostPath:
+          path: /dev/video0

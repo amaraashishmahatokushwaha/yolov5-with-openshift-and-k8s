@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flask-camera-app-config
+data:
+  DEBUG_MODE: "false"
+  LOG_LEVEL: "INFO"
+  # Add more config parameters as needed

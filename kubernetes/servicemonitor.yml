@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: flask-camera-monitor
+  labels:
+    release: prometheus  # Match with your Prometheus Operator release name
+spec:
+  selector:
+    matchLabels:
+      app: flask-camera
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
