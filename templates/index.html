@@ -1,0 +1,320 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YOLOv5 Network Object Detection</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .video-container {
+            margin: 20px auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            max-width: 800px;
+            position: relative;
+        }
+        .video-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 12px 24px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        .start {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .stop {
+            background-color: #f44336;
+            color: white;
+        }
+        .toggle {
+            background-color: #2196F3;
+            color: white;
+        }
+        button:hover {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            background-color: #f0f0f0;
+        }
+        .status.running {
+            background-color: #e8f5e9;
+            color: #4CAF50;
+        }
+        .status.stopped {
+            background-color: #ffebee;
+            color: #f44336;
+        }
+        .network-info {
+            text-align: center;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e3f2fd;
+            border-radius: 5px;
+        }
+        .loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 20px;
+        }
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            button {
+                padding: 10px 20px;
+                font-size: 14px;
+                width: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>YOLOv5 Object Detection</h1>
+        <div class="subtitle">Access from any device on the network at: <span id="server-address">http://{{ ip_address }}:5000</span></div>
+        
+        <div class="controls">
+            <button class="start" id="startBtn" onclick="startCamera()">Start Camera</button>
+            <button class="stop" id="stopBtn" onclick="stopCamera()" disabled>Stop Camera</button>
+            <button class="toggle" id="toggleBtn" onclick="toggleDetection()" disabled>Toggle Detection</button>
+        </div>
+        
+        <div class="status" id="statusBox">Camera is stopped. Click "Start Camera" to begin.</div>
+        
+        <div class="video-container">
+            <img id="video" src="{{ url_for('video_feed') }}" alt="Video feed will appear here when camera is started" style="display: none;">
+            <div id="videoPlaceholder">Video feed will appear here when camera is started</div>
+            <div class="loading" id="loadingIndicator" style="display: none;">
+                <div class="spinner"></div>
+                <div>Loading...</div>
+            </div>
+        </div>
+        
+        <div class="network-info">
+            <p>To access this camera from another device on the same network:</p>
+            <p>Open a web browser and navigate to: <strong id="networkUrl">http://{{ ip_address }}:5000</strong></p>
+        </div>
+    </div>
+
+    <script>
+        let cameraRunning = false;
+        let detectionEnabled = true;
+        
+        // Update UI based on current status
+        function updateUI() {
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const toggleBtn = document.getElementById('toggleBtn');
+            const statusBox = document.getElementById('statusBox');
+            const video = document.getElementById('video');
+            const videoPlaceholder = document.getElementById('videoPlaceholder');
+            
+            startBtn.disabled = cameraRunning;
+            stopBtn.disabled = !cameraRunning;
+            toggleBtn.disabled = !cameraRunning;
+            
+            if (cameraRunning) {
+                statusBox.textContent = `Camera is running. Detection is ${detectionEnabled ? 'ON' : 'OFF'}.`;
+                statusBox.className = 'status running';
+                video.style.display = 'block';
+                videoPlaceholder.style.display = 'none';
+            } else {
+                statusBox.textContent = 'Camera is stopped. Click "Start Camera" to begin.';
+                statusBox.className = 'status stopped';
+                video.style.display = 'none';
+                videoPlaceholder.style.display = 'block';
+            }
+        }
+        
+        // Function to start the camera
+        function startCamera() {
+            showLoading(true);
+            fetch('/start_camera', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({detection: true})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    cameraRunning = true;
+                    detectionEnabled = true;
+                    // Refresh the video source to ensure it connects to the stream
+                    document.getElementById('video').src = "{{ url_for('video_feed') }}?" + new Date().getTime();
+                } else {
+                    alert('Error: ' + data.status);
+                }
+                updateUI();
+                showLoading(false);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showLoading(false);
+                alert('Error starting camera: ' + error);
+            });
+        }
+        
+        // Function to stop the camera
+        function stopCamera() {
+            showLoading(true);
+            fetch('/stop_camera', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    cameraRunning = false;
+                }
+                updateUI();
+                showLoading(false);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showLoading(false);
+                alert('Error stopping camera: ' + error);
+            });
+        }
+        
+        // Function to toggle detection
+        function toggleDetection() {
+            if (!cameraRunning) return;
+            
+            fetch('/toggle_detection', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    detectionEnabled = data.detection_enabled;
+                    updateUI();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error toggling detection: ' + error);
+            });
+        }
+        
+        // Function to show/hide loading indicator
+        function showLoading(show) {
+            document.getElementById('loadingIndicator').style.display = show ? 'flex' : 'none';
+        }
+        
+        // Function to get current status
+        function getStatus() {
+            fetch('/status')
+            .then(response => response.json())
+            .then(data => {
+                cameraRunning = data.camera_running;
+                detectionEnabled = data.detection_enabled;
+                
+                // Update server IP display
+                const serverAddressElements = document.querySelectorAll('#server-address, #networkUrl');
+                serverAddressElements.forEach(el => {
+                    el.textContent = `http://${data.server_ip}:5000`;
+                });
+                
+                updateUI();
+                
+                if (cameraRunning) {
+                    // Ensure video is properly loaded
+                    document.getElementById('video').src = "{{ url_for('video_feed') }}?" + new Date().getTime();
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching status:', error);
+            });
+        }
+        
+        // Initialize on page load
+        window.onload = function() {
+            getStatus();
+            
+            // Add event listener for video load errors
+            document.getElementById('video').onerror = function() {
+                if (cameraRunning) {
+                    console.log('Video stream error, attempting to reconnect...');
+                    setTimeout(() => {
+                        this.src = "{{ url_for('video_feed') }}?" + new Date().getTime();
+                    }, 2000);
+                }
+            };
+        };
+    </script>
+</body>
+</html>
+        

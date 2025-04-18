@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: camera-server
+  labels:
+    app: camera-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: camera-server
+  template:
+    metadata:
+      labels:
+        app: camera-server
+    spec:
+      containers:
+      - name: camera-server
+        image: amardocker608/flask-camera-app:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: RUN_AS_SERVER
+          value: "true"
+        volumeMounts:
+        - name: video-device
+          mountPath: /dev/video0
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        securityContext:
+          privileged: true
+      volumes:
+      - name: video-device
+        hostPath:
+          path: /dev/video0

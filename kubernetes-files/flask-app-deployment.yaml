@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-camera-app
+  labels:
+    app: flask-camera-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: flask-camera-app
+  template:
+    metadata:
+      labels:
+        app: flask-camera-app
+    spec:
+      containers:
+      - name: flask-camera-app
+        image: amardocker608/flask-camera-app:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: RUN_AS_SERVER
+          value: "false"
+        - name: USE_CENTRAL_SERVER
+          value: "true"
+        - name: CAMERA_SERVER_URL
+          value: "http://camera-server:8080/video_feed"
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"

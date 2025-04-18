@@ -1,0 +1,7 @@
+flask==2.3.2
+opencv-python-headless==4.7.0.72
+numpy==1.24.3
+torch==1.13.1
+torchvision==0.14.1
+ultralytics==8.0.136
+prometheus-flask-exporter
